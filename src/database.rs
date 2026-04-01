@@ -1,5 +1,5 @@
 use anyhow::Context;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 
@@ -15,7 +15,7 @@ pub struct Record {
     time: String,
     duration: Option<i32>,
     notes: Option<String>,
-    created_at: NaiveDateTime,
+    created_at: DateTime<Utc>,
 }
 impl Database {
     pub async fn builder() -> anyhow::Result<Self> {
@@ -76,8 +76,8 @@ impl Database {
     }
     pub async fn get_records_from_to(
         &self,
-        from: NaiveDateTime,
-        to: NaiveDateTime,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
     ) -> anyhow::Result<i64> {
         let result = sqlx::query!(
             "SELECT COUNT(*)
@@ -104,8 +104,8 @@ impl Database {
     }
     pub async fn get_entries_from_to(
         &self,
-        from: NaiveDateTime,
-        to: NaiveDateTime,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
     ) -> anyhow::Result<Vec<Record>> {
         let result = sqlx::query_as!(
             Record,

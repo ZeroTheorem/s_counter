@@ -1,9 +1,9 @@
 use anyhow::anyhow;
-use chrono::{Months, NaiveDate, NaiveDateTime};
+use chrono::{DateTime, Months, NaiveDate, Utc};
 
 pub struct ParsedPeriod {
-    pub from: NaiveDateTime,
-    pub to: NaiveDateTime,
+    pub from: DateTime<Utc>,
+    pub to: DateTime<Utc>,
 }
 
 pub fn parse_date_period(from: &str, to: &str) -> anyhow::Result<ParsedPeriod> {
@@ -14,8 +14,8 @@ pub fn parse_date_period(from: &str, to: &str) -> anyhow::Result<ParsedPeriod> {
         .and_hms_opt(0, 0, 0)
         .ok_or_else(|| anyhow!("Invalid time"))?;
     Ok(ParsedPeriod {
-        from: parsed_from,
-        to: parsed_to,
+        from: parsed_from.and_utc(),
+        to: parsed_to.and_utc(),
     })
 }
 
@@ -31,7 +31,7 @@ pub fn parse_period_from_ym(year: i32, month: u32) -> anyhow::Result<ParsedPerio
         .and_hms_opt(0, 0, 0)
         .ok_or_else(|| anyhow!("Invalid time"))?;
     Ok(ParsedPeriod {
-        from: parsed_from,
-        to: parsed_to,
+        from: parsed_from.and_utc(),
+        to: parsed_to.and_utc(),
     })
 }
