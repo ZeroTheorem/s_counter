@@ -1,5 +1,5 @@
 use anyhow::Context;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::Serialize;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 
@@ -34,8 +34,8 @@ impl Database {
         let result = sqlx::query!(
             "SELECT COUNT(*)
              FROM sex
-             WHERE created_at >= date_trunc('day', now())
-             AND created_at < date_trunc('day', now()) + interval '1 day';"
+             WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'Europe/Moscow')
+             AND created_at < date_trunc('day', now() AT TIME ZONE 'Europe/Moscow') + interval '1 day';"
         )
         .fetch_one(&self.pool)
         .await?;
@@ -45,8 +45,8 @@ impl Database {
         let result = sqlx::query!(
             "SELECT COUNT(*)
              FROM sex
-             WHERE created_at >= date_trunc('week', now())
-             AND created_at < date_trunc('week', now()) + interval '1 week';"
+             WHERE created_at >= date_trunc('week', now() AT TIME ZONE 'Europe/Moscow')
+             AND created_at < date_trunc('week', now() AT TIME ZONE 'Europe/Moscow') + interval '1 week';"
         )
         .fetch_one(&self.pool)
         .await?;
@@ -56,8 +56,8 @@ impl Database {
         let result = sqlx::query!(
             "SELECT COUNT(*)
              FROM sex
-             WHERE created_at >= date_trunc('month', now())
-             AND created_at < date_trunc('month', now()) + interval '1 month';"
+             WHERE created_at >= date_trunc('month', now() AT TIME ZONE 'Europe/Moscow')
+             AND created_at < date_trunc('month', now() AT TIME ZONE 'Europe/Moscow') + interval '1 month';"
         )
         .fetch_one(&self.pool)
         .await?;
@@ -67,8 +67,8 @@ impl Database {
         let result = sqlx::query!(
             "SELECT COUNT(*)
              FROM sex
-             WHERE created_at >= date_trunc('year', now())
-             AND created_at < date_trunc('year', now()) + interval '1 year';"
+             WHERE created_at >= date_trunc('year', now() AT TIME ZONE 'Europe/Moscow')
+             AND created_at < date_trunc('year', now() AT TIME ZONE 'Europe/Moscow') + interval '1 year';"
         )
         .fetch_one(&self.pool)
         .await?;

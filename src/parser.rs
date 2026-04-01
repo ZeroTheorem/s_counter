@@ -1,5 +1,6 @@
 use anyhow::anyhow;
-use chrono::{DateTime, Months, NaiveDate, Utc};
+use chrono::{DateTime, Months, NaiveDate, NaiveDateTime, Utc};
+use tracing::info;
 
 pub struct ParsedPeriod {
     pub from: DateTime<Utc>,
@@ -30,6 +31,7 @@ pub fn parse_period_from_ym(year: i32, month: u32) -> anyhow::Result<ParsedPerio
         .ok_or_else(|| anyhow!("Failed add month to date"))?
         .and_hms_opt(0, 0, 0)
         .ok_or_else(|| anyhow!("Invalid time"))?;
+    info!("{} ---- {}", parsed_from, parsed_to);
     Ok(ParsedPeriod {
         from: parsed_from.and_utc(),
         to: parsed_to.and_utc(),
