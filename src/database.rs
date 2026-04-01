@@ -1,5 +1,5 @@
 use anyhow::Context;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 
