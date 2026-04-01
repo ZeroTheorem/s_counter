@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use chrono::{DateTime, Months, NaiveDate, Utc};
+
 use tracing::info;
 
 pub struct ParsedPeriod {

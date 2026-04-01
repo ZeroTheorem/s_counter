@@ -2,6 +2,7 @@ use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::{PgPool, postgres::PgPoolOptions};
+use tracing::warn;
 
 #[derive(Clone, Debug)]
 pub struct Database {
@@ -34,19 +35,21 @@ impl Database {
         let result = sqlx::query!(
             "SELECT COUNT(*)
              FROM sex
-             WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'Europe/Moscow')
-             AND created_at < date_trunc('day', now() AT TIME ZONE 'Europe/Moscow') + interval '1 day';"
+             WHERE created_at >= date_trunc('day', now())
+             AND created_at < date_trunc('day', now()) + interval '1 day';"
         )
         .fetch_one(&self.pool)
         .await?;
+        let result2 = sqlx::query!("SELECT now()").fetch_one(&self.pool).await?;
+        warn!("{}", result2.now.unwrap());
         Ok(result.count.unwrap_or(0))
     }
     pub async fn get_current_week_records(&self) -> anyhow::Result<i64> {
         let result = sqlx::query!(
             "SELECT COUNT(*)
              FROM sex
-             WHERE created_at >= date_trunc('week', now() AT TIME ZONE 'Europe/Moscow')
-             AND created_at < date_trunc('week', now() AT TIME ZONE 'Europe/Moscow') + interval '1 week';"
+             WHERE created_at >= date_trunc('week', now())
+             AND created_at < date_trunc('week', now()) + interval '1 week';"
         )
         .fetch_one(&self.pool)
         .await?;
@@ -56,8 +59,8 @@ impl Database {
         let result = sqlx::query!(
             "SELECT COUNT(*)
              FROM sex
-             WHERE created_at >= date_trunc('month', now() AT TIME ZONE 'Europe/Moscow')
-             AND created_at < date_trunc('month', now() AT TIME ZONE 'Europe/Moscow') + interval '1 month';"
+             WHERE created_at >= date_trunc('month', now())
+             AND created_at < date_trunc('month', now()) + interval '1 month';"
         )
         .fetch_one(&self.pool)
         .await?;
@@ -67,8 +70,8 @@ impl Database {
         let result = sqlx::query!(
             "SELECT COUNT(*)
              FROM sex
-             WHERE created_at >= date_trunc('year', now() AT TIME ZONE 'Europe/Moscow')
-             AND created_at < date_trunc('year', now() AT TIME ZONE 'Europe/Moscow') + interval '1 year';"
+             WHERE created_at >= date_trunc('year', now())
+             AND created_at < date_trunc('year', now()) + interval '1 year';"
         )
         .fetch_one(&self.pool)
         .await?;
