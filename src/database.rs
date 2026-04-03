@@ -32,7 +32,7 @@ impl Database {
             .context("error while migrate")?;
         Ok(Database { pool })
     }
-    pub async fn get_records_from_period(&self, period: DateBounds) -> anyhow::Result<i64> {
+    pub async fn count_records_for_period(&self, period: DateBounds) -> anyhow::Result<i64> {
         let result = sqlx::query!(
             "SELECT COUNT(*)
              FROM sex
@@ -46,23 +46,6 @@ impl Database {
         Ok(result.count.unwrap_or(0))
     }
 
-    pub async fn get_records_from_to(
-        &self,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-    ) -> anyhow::Result<i64> {
-        let result = sqlx::query!(
-            "SELECT COUNT(*)
-             FROM sex
-             WHERE created_at >= $1
-             AND created_at < $2",
-            from,
-            to
-        )
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(result.count.unwrap_or(0))
-    }
     pub async fn add_record(&self, date: String, time: String) -> anyhow::Result<Record> {
         let record = sqlx::query_as!(
             Record,
@@ -74,11 +57,7 @@ impl Database {
         .await?;
         Ok(record)
     }
-    pub async fn get_entries_from_to(
-        &self,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
-    ) -> anyhow::Result<Vec<Record>> {
+    pub async fn get_records_for_period(&self, period: DateBounds) -> anyhow::Result<Vec<Record>> {
         let result = sqlx::query_as!(
             Record,
             "SELECT *
@@ -86,8 +65,8 @@ impl Database {
              WHERE created_at >= $1
              AND created_at < $2
              ORDER BY created_at DESC",
-            from,
-            to
+            period.start,
+            period.end
         )
         .fetch_all(&self.pool)
         .await?;

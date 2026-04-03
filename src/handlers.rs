@@ -7,7 +7,6 @@ use serde_json::{Value, json};
 
 use crate::{
     database::Database,
-    parser::{parse_date_period, parse_period_from_ym},
     query_params::{GetEntriesParams, GetStatsParams},
     requests_bodies::CreateRecordBody,
     responses::ApiResponse,
@@ -19,23 +18,21 @@ pub async fn get_stats_handler(
     Query(params): Query<GetStatsParams>,
 ) -> (StatusCode, Json<Value>) {
     if let (Some(from), Some(to)) = (params.from, params.to) {
-        let parsed_period = match parse_date_period(&from, &to) {
-            Ok(parsed_period) => parsed_period,
-            Err(_) => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(json!({"message": "Invalid date"})),
-                );
-            }
-        };
-        match storage
-            .get_records_from_to(parsed_period.from, parsed_period.to)
-            .await
-        {
+        let period_bounds =
+            match period_bounds_utc("Europe/Moscow", Period::Offset { from: from, to: to }) {
+                Ok(period_bounds) => period_bounds,
+                Err(_) => {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({"message": "Internal server error"})),
+                    );
+                }
+            };
+        match storage.count_records_for_period(period_bounds).await {
             Ok(value) => {
                 return (
                     StatusCode::OK,
-                    Json(json!({"count": value, "period": params.period, "from": from, "to": to})),
+                    Json(json!({"count": value, "period": params.period})),
                 );
             }
             Err(_) => {
@@ -47,10 +44,10 @@ pub async fn get_stats_handler(
         }
     }
     let period = match params.period.as_deref() {
-        Some("day") => Period::Day,
-        Some("week") => Period::Week,
-        Some("month") => Period::Month,
-        Some("year") => Period::Year,
+        Some("day") => Period::ToDay,
+        Some("week") => Period::CurrentWeek,
+        Some("month") => Period::CurrentMonth,
+        Some("year") => Period::CurrentYear,
         _ => {
             return (
                 StatusCode::BAD_REQUEST,
@@ -67,7 +64,7 @@ pub async fn get_stats_handler(
             );
         }
     };
-    match storage.get_records_from_period(period_bounds).await {
+    match storage.count_records_for_period(period_bounds).await {
         Ok(value) => (
             StatusCode::OK,
             Json(json!({"count": value, "period": params.period})),
@@ -96,11 +93,17 @@ pub async fn create_record_handler<'a>(
         }
     }
 }
-pub async fn get_entries<'a>(
+pub async fn get_records<'a>(
     State(storage): State<Database>,
     Query(params): Query<GetEntriesParams>,
 ) -> (StatusCode, Json<ApiResponse<'a>>) {
-    let parsed_period = match parse_period_from_ym(params.year, params.month) {
+    let parsed_period = match period_bounds_utc(
+        "Europe/Moscow",
+        Period::ParticularMonth {
+            year: params.year,
+            month: params.month,
+        },
+    ) {
         Ok(parsed_period) => parsed_period,
         Err(_) => {
             return (
@@ -111,10 +114,7 @@ pub async fn get_entries<'a>(
             );
         }
     };
-    match storage
-        .get_entries_from_to(parsed_period.from, parsed_period.to)
-        .await
-    {
+    match storage.get_records_for_period(parsed_period).await {
         Ok(records) => {
             return (StatusCode::OK, Json(ApiResponse::Records(records)));
         }

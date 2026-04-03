@@ -1,6 +1,5 @@
 mod database;
 mod handlers;
-mod parser;
 mod query_params;
 mod requests_bodies;
 mod responses;
@@ -17,7 +16,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::{
     database::Database,
-    handlers::{create_record_handler, delete_record_handler, get_entries, get_stats_handler},
+    handlers::{create_record_handler, delete_record_handler, get_records, get_stats_handler},
 };
 
 #[tokio::main]
@@ -36,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/stats", get(get_stats_handler))
         .route("/api/entries", post(create_record_handler))
         .route("/api/entries/{record_id}", delete(delete_record_handler))
-        .route("/api/entries", get(get_entries))
+        .route("/api/entries", get(get_records))
         .with_state(storage)
         .layer(http_log)
         .fallback_service(ServeDir::new("dist"));

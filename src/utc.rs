@@ -8,10 +8,12 @@ pub struct DateBounds {
 }
 
 pub enum Period {
-    Day,
-    Week,
-    Month,
-    Year,
+    ToDay,
+    CurrentWeek,
+    CurrentMonth,
+    CurrentYear,
+    ParticularMonth { year: i32, month: u32 },
+    Offset { from: String, to: String },
 }
 
 fn parse_tz(localtime: MappedLocalTime<DateTime<Tz>>) -> anyhow::Result<DateTime<Utc>> {
@@ -39,13 +41,13 @@ pub fn period_bounds_utc(tz_str: &str, period: Period) -> anyhow::Result<DateBou
     let now_year = now_local.year();
 
     let (start, end) = match period {
-        Period::Day => {
+        Period::ToDay => {
             let start_day =
                 NaiveDate::from_ymd_opt(now_year, now_month, now_day).context("Invalid date")?;
             let end_day = start_day + Duration::days(1);
             (start_day, end_day)
         }
-        Period::Week => {
+        Period::CurrentWeek => {
             let days_from_monday = now_weekday.num_days_from_monday() as i64;
             let start_week = NaiveDate::from_ymd_opt(now_year, now_month, now_day)
                 .context("Invalid date")?
@@ -53,7 +55,7 @@ pub fn period_bounds_utc(tz_str: &str, period: Period) -> anyhow::Result<DateBou
             let end_week = start_week + Duration::days(7);
             (start_week, end_week)
         }
-        Period::Month => {
+        Period::CurrentMonth => {
             let start_month =
                 NaiveDate::from_ymd_opt(now_year, now_month, 1).context("Invalid date")?;
             let (new_year, new_month) = if now_month == 12 {
@@ -65,10 +67,26 @@ pub fn period_bounds_utc(tz_str: &str, period: Period) -> anyhow::Result<DateBou
                 NaiveDate::from_ymd_opt(new_year, new_month, 1).context("Invalid date")?;
             (start_month, end_month)
         }
-        Period::Year => {
+        Period::CurrentYear => {
             let start_year = NaiveDate::from_ymd_opt(now_year, 1, 1).context("Invalid date")?;
             let end_year = NaiveDate::from_ymd_opt(now_year + 1, 1, 1).context("Invalid date")?;
             (start_year, end_year)
+        }
+        Period::ParticularMonth { year, month } => {
+            let start_month = NaiveDate::from_ymd_opt(year, month, 1).context("Invalid date")?;
+            let (new_year, new_month) = if now_month == 12 {
+                (start_month.year() + 1, 1)
+            } else {
+                (start_month.year(), start_month.month() + 1)
+            };
+            let end_month =
+                NaiveDate::from_ymd_opt(new_year, new_month, 1).context("Invalid date")?;
+            (start_month, end_month)
+        }
+        Period::Offset { from, to } => {
+            let start = NaiveDate::parse_from_str(&from, "%Y-%m-%d")?;
+            let end = NaiveDate::parse_from_str(&to, "%Y-%m-%d")?;
+            (start, end)
         }
     };
 
