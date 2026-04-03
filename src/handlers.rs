@@ -78,7 +78,7 @@ pub async fn get_stats_handler(
 pub async fn create_record_handler<'a>(
     State(storage): State<Database>,
     extract::Json(body): extract::Json<CreateRecordBody>,
-) -> (StatusCode, Json<ApiResponse<'a>>) {
+) -> (StatusCode, Json<ApiResponse>) {
     match storage.add_record(body.date, body.time).await {
         Ok(record) => {
             return (StatusCode::CREATED, Json(ApiResponse::Record(record)));
@@ -87,7 +87,7 @@ pub async fn create_record_handler<'a>(
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ApiResponse::Error {
-                    message: "Internal server error",
+                    message: "Internal server error".to_string(),
                 }),
             );
         }
@@ -96,7 +96,7 @@ pub async fn create_record_handler<'a>(
 pub async fn get_records<'a>(
     State(storage): State<Database>,
     Query(params): Query<GetEntriesParams>,
-) -> (StatusCode, Json<ApiResponse<'a>>) {
+) -> (StatusCode, Json<ApiResponse>) {
     let parsed_period = match period_bounds_utc(
         "Europe/Moscow",
         Period::ParticularMonth {
@@ -109,7 +109,7 @@ pub async fn get_records<'a>(
             return (
                 StatusCode::BAD_REQUEST,
                 Json(ApiResponse::Error {
-                    message: "Internal server error",
+                    message: "Internal server error".to_string(),
                 }),
             );
         }
@@ -122,7 +122,7 @@ pub async fn get_records<'a>(
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ApiResponse::Error {
-                    message: "Internal server error",
+                    message: "Internal server error".to_string(),
                 }),
             );
         }
@@ -131,20 +131,22 @@ pub async fn get_records<'a>(
 pub async fn delete_record_handler<'a>(
     State(storage): State<Database>,
     Path(record_id): Path<i64>,
-) -> (StatusCode, Json<ApiResponse<'a>>) {
+) -> (StatusCode, Json<ApiResponse>) {
     match storage.delete_record(record_id).await {
         Ok(record) => match record {
             Some(_) => {
                 return (
                     StatusCode::NO_CONTENT,
-                    Json(ApiResponse::Success { status: "success" }),
+                    Json(ApiResponse::Success {
+                        status: "success".to_string(),
+                    }),
                 );
             }
             None => {
                 return (
                     StatusCode::NOT_FOUND,
                     Json(ApiResponse::Error {
-                        message: "Entry not found",
+                        message: "Entry not found".to_string(),
                     }),
                 );
             }
@@ -153,7 +155,7 @@ pub async fn delete_record_handler<'a>(
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ApiResponse::Error {
-                    message: "Internal server error",
+                    message: "Internal server error".to_string(),
                 }),
             );
         }
