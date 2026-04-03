@@ -2,10 +2,12 @@ use axum::{
     Json,
     extract::{self, Path, Query, State},
     http::StatusCode,
+    response::Result,
 };
 
 use crate::{
     database::Database,
+    errors::AppError,
     query_params::{GetEntriesParams, GetStatsParams},
     requests_bodies::CreateRecordBody,
     responses::ApiResponse,
@@ -93,20 +95,9 @@ pub async fn get_stats_handler(
 pub async fn create_record_handler<'a>(
     State(storage): State<Database>,
     extract::Json(body): extract::Json<CreateRecordBody>,
-) -> (StatusCode, Json<ApiResponse>) {
-    match storage.add_record(body.date, body.time).await {
-        Ok(record) => {
-            return (StatusCode::CREATED, Json(ApiResponse::Record(record)));
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::Error {
-                    message: "Internal server error".to_string(),
-                }),
-            );
-        }
-    }
+) -> Result<(StatusCode, Json<ApiResponse>), AppError> {
+    let record = storage.add_record(body.date, body.time).await?;
+    Ok((StatusCode::CREATED, Json(ApiResponse::Record(record))))
 }
 pub async fn get_records<'a>(
     State(storage): State<Database>,

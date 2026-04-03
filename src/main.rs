@@ -1,4 +1,5 @@
 mod database;
+mod errors;
 mod handlers;
 mod query_params;
 mod requests_bodies;
@@ -29,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let http_log = TraceLayer::new_for_http();
-    let storage = Database::builder().await?;
+    let storage = Database::new().await?;
 
     let router = Router::new()
         .route("/api/stats", get(get_stats_handler))

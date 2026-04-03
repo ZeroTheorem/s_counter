@@ -20,7 +20,7 @@ pub struct Record {
     created_at: DateTime<Utc>,
 }
 impl Database {
-    pub async fn builder() -> anyhow::Result<Self> {
+    pub async fn new() -> anyhow::Result<Self> {
         let database_url = &std::env::var("DATABASE_URL").context("DATABASE_URL not found")?;
         let pool = PgPoolOptions::new()
             .max_connections(5)

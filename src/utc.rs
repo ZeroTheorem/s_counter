@@ -74,7 +74,7 @@ pub fn period_bounds_utc(tz_str: &str, period: Period) -> anyhow::Result<DateBou
         }
         Period::ParticularMonth { year, month } => {
             let start_month = NaiveDate::from_ymd_opt(year, month, 1).context("Invalid date")?;
-            let (new_year, new_month) = if now_month == 12 {
+            let (new_year, new_month) = if month == 12 {
                 (start_month.year() + 1, 1)
             } else {
                 (start_month.year(), start_month.month() + 1)
