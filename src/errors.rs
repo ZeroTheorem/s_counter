@@ -7,7 +7,7 @@ use axum::{
 pub enum AppError {
     BadRequest,
     NotFound,
-    Internal(anyhow::Error),
+    Internal,
 }
 
 impl IntoResponse for AppError {
@@ -15,17 +15,14 @@ impl IntoResponse for AppError {
         let (status, message) = match self {
             AppError::BadRequest => (StatusCode::BAD_REQUEST, "Bad request"),
             AppError::NotFound => (StatusCode::NOT_FOUND, "Not found"),
-            AppError::Internal(error) => {
-                tracing::error!("Internal error: {error:?}");
-                (StatusCode::BAD_REQUEST, "Internal server error")
-            }
+            AppError::Internal => (StatusCode::BAD_REQUEST, "Internal server error"),
         };
         (status, Json(serde_json::json!({"message": message}))).into_response()
     }
 }
 
 impl From<anyhow::Error> for AppError {
-    fn from(error: anyhow::Error) -> AppError {
-        Self::Internal(error)
+    fn from(_: anyhow::Error) -> AppError {
+        Self::Internal
     }
 }

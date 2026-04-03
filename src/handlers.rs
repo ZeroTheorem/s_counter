@@ -1,10 +1,3 @@
-use axum::{
-    Json,
-    extract::{self, Path, Query, State},
-    http::StatusCode,
-    response::Result,
-};
-
 use crate::{
     database::Database,
     errors::AppError,
@@ -13,157 +6,83 @@ use crate::{
     responses::ApiResponse,
     utc::{Period, period_bounds_utc},
 };
+use axum::{
+    Json,
+    extract::{self, Path, Query, State},
+    http::StatusCode,
+    response::Result,
+};
+
+const TIME_ZONE: &str = "Europe/Moscow";
+
+type Response = Result<(StatusCode, Json<ApiResponse>), AppError>;
 
 pub async fn get_stats_handler(
     State(storage): State<Database>,
     Query(params): Query<GetStatsParams>,
-) -> (StatusCode, Json<ApiResponse>) {
-    if let (Some(from), Some(to)) = (params.from, params.to) {
-        let period_bounds =
-            match period_bounds_utc("Europe/Moscow", Period::Offset { from: from, to: to }) {
-                Ok(period_bounds) => period_bounds,
-                Err(_) => {
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ApiResponse::Error {
-                            message: "Internal server error".to_string(),
-                        }),
-                    );
-                }
-            };
-        match storage.count_records_for_period(period_bounds).await {
-            Ok(value) => {
-                return (
-                    StatusCode::OK,
-                    Json(ApiResponse::RecordCounts {
-                        count: value,
-                        period: params.period,
-                    }),
-                );
-            }
-            Err(_) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ApiResponse::Error {
-                        message: "Internal server error".to_string(),
-                    }),
-                );
-            }
-        }
-    }
-    let period = match params.period.as_deref() {
-        Some("day") => Period::ToDay,
-        Some("week") => Period::CurrentWeek,
-        Some("month") => Period::CurrentMonth,
-        Some("year") => Period::CurrentYear,
-        _ => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ApiResponse::Error {
-                    message: "Bad request".to_string(),
-                }),
-            );
-        }
+) -> Response {
+    let period_bounds = if let (Some(from), Some(to)) = (params.from, params.to) {
+        let period_bounds = period_bounds_utc(TIME_ZONE, Period::Offset { from: from, to: to })?;
+        period_bounds
+    } else {
+        let period = match params.period.as_deref() {
+            Some("day") => Period::ToDay,
+            Some("week") => Period::CurrentWeek,
+            Some("month") => Period::CurrentMonth,
+            Some("year") => Period::CurrentYear,
+            _ => return Err(AppError::BadRequest),
+        };
+        let period_bounds = period_bounds_utc(TIME_ZONE, period)?;
+        period_bounds
     };
-    let period_bounds = match period_bounds_utc("Europe/Moscow", period) {
-        Ok(period_bounds) => period_bounds,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::Error {
-                    message: "Internal server error".to_string(),
-                }),
-            );
-        }
-    };
-    match storage.count_records_for_period(period_bounds).await {
-        Ok(value) => (
-            StatusCode::OK,
-            Json(ApiResponse::RecordCounts {
-                count: value,
-                period: params.period,
-            }),
-        ),
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::Error {
-                message: "Internal server error".to_string(),
-            }),
-        ),
-    }
+
+    let count = storage.count_records_for_period(period_bounds).await?;
+
+    Ok((
+        StatusCode::OK,
+        Json(ApiResponse::RecordCounts {
+            count: count,
+            period: params.period,
+        }),
+    ))
 }
-pub async fn create_record_handler<'a>(
+pub async fn create_record_handler(
     State(storage): State<Database>,
     extract::Json(body): extract::Json<CreateRecordBody>,
-) -> Result<(StatusCode, Json<ApiResponse>), AppError> {
+) -> Response {
     let record = storage.add_record(body.date, body.time).await?;
     Ok((StatusCode::CREATED, Json(ApiResponse::Record(record))))
 }
-pub async fn get_records<'a>(
+pub async fn get_records(
     State(storage): State<Database>,
     Query(params): Query<GetEntriesParams>,
-) -> (StatusCode, Json<ApiResponse>) {
-    let parsed_period = match period_bounds_utc(
-        "Europe/Moscow",
+) -> Response {
+    let parsed_period = period_bounds_utc(
+        TIME_ZONE,
         Period::ParticularMonth {
             year: params.year,
             month: params.month,
         },
-    ) {
-        Ok(parsed_period) => parsed_period,
-        Err(_) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ApiResponse::Error {
-                    message: "Internal server error".to_string(),
-                }),
-            );
-        }
-    };
-    match storage.get_records_for_period(parsed_period).await {
-        Ok(records) => {
-            return (StatusCode::OK, Json(ApiResponse::Records(records)));
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::Error {
-                    message: "Internal server error".to_string(),
-                }),
-            );
-        }
-    }
+    )?;
+    let records = storage.get_records_for_period(parsed_period).await?;
+    Ok((StatusCode::OK, Json(ApiResponse::Records(records))))
 }
-pub async fn delete_record_handler<'a>(
+pub async fn delete_record_handler(
     State(storage): State<Database>,
     Path(record_id): Path<i64>,
-) -> (StatusCode, Json<ApiResponse>) {
-    match storage.delete_record(record_id).await {
-        Ok(record) => match record {
-            Some(_) => {
-                return (
-                    StatusCode::NO_CONTENT,
-                    Json(ApiResponse::Success {
-                        status: "success".to_string(),
-                    }),
-                );
-            }
-            None => {
-                return (
-                    StatusCode::NOT_FOUND,
-                    Json(ApiResponse::Error {
-                        message: "Entry not found".to_string(),
-                    }),
-                );
-            }
-        },
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::Error {
-                    message: "Internal server error".to_string(),
+) -> Response {
+    let record = storage.delete_record(record_id).await?;
+    match record {
+        Some(_) => {
+            return Ok((
+                StatusCode::NO_CONTENT,
+                Json(ApiResponse::Success {
+                    status: "success".to_string(),
                 }),
-            );
+            ));
         }
-    }
+        None => {
+            return Err(AppError::NotFound);
+        }
+    };
 }
