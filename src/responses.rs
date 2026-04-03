@@ -9,5 +9,4 @@ pub enum ApiResponse {
     Record(Record),
     Records(Vec<Record>),
     Success { status: String },
-    Error { message: String },
 }
