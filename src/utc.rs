@@ -1,5 +1,5 @@
-use anyhow::Context;
-use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
+use anyhow::{Context, bail};
+use chrono::{DateTime, Datelike, Duration, MappedLocalTime, NaiveDate, TimeZone, Utc};
 use chrono_tz::Tz;
 
 pub struct DateBounds {
@@ -14,6 +14,21 @@ pub enum Period {
     Year,
 }
 
+fn parse_tz(localtime: MappedLocalTime<DateTime<Tz>>) -> anyhow::Result<DateTime<Utc>> {
+    match localtime {
+        MappedLocalTime::Single(time) => Ok(time.with_timezone(&Utc)),
+        MappedLocalTime::Ambiguous(earliest, _) => Ok(earliest.with_timezone(&Utc)),
+        MappedLocalTime::None => {
+            bail!("The local time does not exist because there is a _gap_ in the local time")
+        }
+    }
+}
+
+fn get_utc(tz: Tz, date: NaiveDate) -> anyhow::Result<DateTime<Utc>> {
+    let utc = tz.with_ymd_and_hms(date.year(), date.month(), date.day(), 0, 0, 0);
+    parse_tz(utc)
+}
+
 pub fn period_bounds_utc(tz_str: &str, period: Period) -> anyhow::Result<DateBounds> {
     let tz: Tz = tz_str.parse().context("Invalid time zone")?;
     let now_local = Utc::now().with_timezone(&tz);
@@ -23,73 +38,42 @@ pub fn period_bounds_utc(tz_str: &str, period: Period) -> anyhow::Result<DateBou
     let now_month = now_local.month();
     let now_year = now_local.year();
 
-    match period {
+    let (start, end) = match period {
         Period::Day => {
-            let start = tz
-                .with_ymd_and_hms(now_year, now_month, now_day, 0, 0, 0)
-                .unwrap();
-            let end = start + Duration::days(1);
-            Ok(DateBounds {
-                start: start.with_timezone(&Utc),
-                end: end.with_timezone(&Utc),
-            })
+            let start_day =
+                NaiveDate::from_ymd_opt(now_year, now_month, now_day).context("Invalid date")?;
+            let end_day = start_day + Duration::days(1);
+            (start_day, end_day)
         }
         Period::Week => {
-            let days_to_subtract = now_weekday.num_days_from_monday() as i64;
-
-            let today_date = now_local.date_naive();
-
-            let start_monday_date = today_date - Duration::days(days_to_subtract);
-
-            let next_monday_date = start_monday_date + Duration::weeks(1);
-
-            let start = tz
-                .with_ymd_and_hms(
-                    start_monday_date.year(),
-                    start_monday_date.month(),
-                    start_monday_date.day(),
-                    0,
-                    0,
-                    0,
-                )
-                .unwrap();
-            let end = tz
-                .with_ymd_and_hms(
-                    next_monday_date.year(),
-                    next_monday_date.month(),
-                    next_monday_date.day(),
-                    0,
-                    0,
-                    0,
-                )
-                .unwrap();
-
-            Ok(DateBounds {
-                start: start.with_timezone(&Utc),
-                end: end.with_timezone(&Utc),
-            })
+            let days_from_monday = now_weekday.num_days_from_monday() as i64;
+            let start_week = NaiveDate::from_ymd_opt(now_year, now_month, now_day)
+                .context("Invalid date")?
+                - Duration::days(days_from_monday);
+            let end_week = start_week + Duration::days(7);
+            (start_week, end_week)
         }
         Period::Month => {
-            let start = tz
-                .with_ymd_and_hms(now_year, now_month, 1, 0, 0, 0)
-                .unwrap();
-            let next_month = start + Duration::days(32);
-            let end = tz
-                .with_ymd_and_hms(next_month.year(), next_month.month(), 1, 0, 0, 0)
-                .unwrap();
-            Ok(DateBounds {
-                start: start.with_timezone(&Utc),
-                end: end.with_timezone(&Utc),
-            })
+            let start_month =
+                NaiveDate::from_ymd_opt(now_year, now_month, 1).context("Invalid date")?;
+            let (new_year, new_month) = if now_month == 12 {
+                (start_month.year() + 1, 1)
+            } else {
+                (start_month.year(), start_month.month() + 1)
+            };
+            let end_month =
+                NaiveDate::from_ymd_opt(new_year, new_month, 1).context("Invalid date")?;
+            (start_month, end_month)
         }
         Period::Year => {
-            let start = tz.with_ymd_and_hms(now_year, 1, 1, 0, 0, 0).unwrap();
-            let end = tz.with_ymd_and_hms(now_year + 1, 1, 1, 0, 0, 0).unwrap();
-
-            Ok(DateBounds {
-                start: start.with_timezone(&Utc),
-                end: end.with_timezone(&Utc),
-            })
+            let start_year = NaiveDate::from_ymd_opt(now_year, 1, 1).context("Invalid date")?;
+            let end_year = NaiveDate::from_ymd_opt(now_year + 1, 1, 1).context("Invalid date")?;
+            (start_year, end_year)
         }
-    }
+    };
+
+    Ok(DateBounds {
+        start: get_utc(tz, start)?,
+        end: get_utc(tz, end)?,
+    })
 }

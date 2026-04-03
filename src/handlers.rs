@@ -46,100 +46,38 @@ pub async fn get_stats_handler(
             }
         }
     }
-    match params.period.as_deref() {
-        Some("day") => {
-            let period_bounds = match period_bounds_utc("Europe/Moscow", Period::Day) {
-                Ok(period_bounds) => period_bounds,
-                Err(_) => {
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(json!({"message": "Internal server error"})),
-                    );
-                }
-            };
-            match storage.get_records_from_period(period_bounds).await {
-                Ok(value) => (
-                    StatusCode::OK,
-                    Json(json!({"count": value, "period": params.period})),
-                ),
-                Err(_) => (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"message": "Internal server error"})),
-                ),
-            }
+    let period = match params.period.as_deref() {
+        Some("day") => Period::Day,
+        Some("week") => Period::Week,
+        Some("month") => Period::Month,
+        Some("year") => Period::Year,
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"message": "Bad request"})),
+            );
         }
-
-        Some("week") => {
-            let period_bounds = match period_bounds_utc("Europe/Moscow", Period::Week) {
-                Ok(period_bounds) => period_bounds,
-                Err(_) => {
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(json!({"message": "Internal server error"})),
-                    );
-                }
-            };
-            match storage.get_records_from_period(period_bounds).await {
-                Ok(value) => (
-                    StatusCode::OK,
-                    Json(json!({"count": value, "period": params.period})),
-                ),
-                Err(_) => (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"message": "Internal server error"})),
-                ),
-            }
+    };
+    let period_bounds = match period_bounds_utc("Europe/Moscow", period) {
+        Ok(period_bounds) => period_bounds,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"message": "Internal server error"})),
+            );
         }
-
-        Some("month") => {
-            let period_bounds = match period_bounds_utc("Europe/Moscow", Period::Month) {
-                Ok(period_bounds) => period_bounds,
-                Err(_) => {
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(json!({"message": "Internal server error"})),
-                    );
-                }
-            };
-            match storage.get_records_from_period(period_bounds).await {
-                Ok(value) => (
-                    StatusCode::OK,
-                    Json(json!({"count": value, "period": params.period})),
-                ),
-                Err(_) => (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"message": "Internal server error"})),
-                ),
-            }
-        }
-        Some("year") => {
-            let period_bounds = match period_bounds_utc("Europe/Moscow", Period::Year) {
-                Ok(period_bounds) => period_bounds,
-                Err(_) => {
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(json!({"message": "Internal server error"})),
-                    );
-                }
-            };
-            match storage.get_records_from_period(period_bounds).await {
-                Ok(value) => (
-                    StatusCode::OK,
-                    Json(json!({"count": value, "period": params.period})),
-                ),
-                Err(_) => (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"message": "Internal server error"})),
-                ),
-            }
-        }
-        _ => (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"message": "Bad request"})),
+    };
+    match storage.get_records_from_period(period_bounds).await {
+        Ok(value) => (
+            StatusCode::OK,
+            Json(json!({"count": value, "period": params.period})),
+        ),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"message": "Internal server error"})),
         ),
     }
 }
-
 pub async fn create_record_handler<'a>(
     State(storage): State<Database>,
     extract::Json(body): extract::Json<CreateRecordBody>,
