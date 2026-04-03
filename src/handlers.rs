@@ -3,7 +3,6 @@ use axum::{
     extract::{self, Path, Query, State},
     http::StatusCode,
 };
-use serde_json::{Value, json};
 
 use crate::{
     database::Database,
@@ -16,7 +15,7 @@ use crate::{
 pub async fn get_stats_handler(
     State(storage): State<Database>,
     Query(params): Query<GetStatsParams>,
-) -> (StatusCode, Json<Value>) {
+) -> (StatusCode, Json<ApiResponse>) {
     if let (Some(from), Some(to)) = (params.from, params.to) {
         let period_bounds =
             match period_bounds_utc("Europe/Moscow", Period::Offset { from: from, to: to }) {
@@ -24,7 +23,9 @@ pub async fn get_stats_handler(
                 Err(_) => {
                     return (
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(json!({"message": "Internal server error"})),
+                        Json(ApiResponse::Error {
+                            message: "Internal server error".to_string(),
+                        }),
                     );
                 }
             };
@@ -32,13 +33,18 @@ pub async fn get_stats_handler(
             Ok(value) => {
                 return (
                     StatusCode::OK,
-                    Json(json!({"count": value, "period": params.period})),
+                    Json(ApiResponse::RecordCounts {
+                        count: value,
+                        period: params.period,
+                    }),
                 );
             }
             Err(_) => {
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"message": "Internal server error"})),
+                    Json(ApiResponse::Error {
+                        message: "Internal server error".to_string(),
+                    }),
                 );
             }
         }
@@ -51,7 +57,9 @@ pub async fn get_stats_handler(
         _ => {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(json!({"message": "Bad request"})),
+                Json(ApiResponse::Error {
+                    message: "Bad request".to_string(),
+                }),
             );
         }
     };
@@ -60,18 +68,25 @@ pub async fn get_stats_handler(
         Err(_) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"message": "Internal server error"})),
+                Json(ApiResponse::Error {
+                    message: "Internal server error".to_string(),
+                }),
             );
         }
     };
     match storage.count_records_for_period(period_bounds).await {
         Ok(value) => (
             StatusCode::OK,
-            Json(json!({"count": value, "period": params.period})),
+            Json(ApiResponse::RecordCounts {
+                count: value,
+                period: params.period,
+            }),
         ),
         Err(_) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"message": "Internal server error"})),
+            Json(ApiResponse::Error {
+                message: "Internal server error".to_string(),
+            }),
         ),
     }
 }
